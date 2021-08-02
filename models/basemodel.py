@@ -14,6 +14,7 @@ import logging
 from tqdm import tqdm
 import torch
 import torch.nn as nn
+import numpy as np
 from torch.utils.tensorboard import SummaryWriter
 from utils.evaluation import evaluate_auc
 from utils.selection import *
@@ -257,6 +258,28 @@ class BaseModel(nn.Module):
 
         save_dir = r'./save_model/' +self.args.m + '.ckpt'
         torch.save(self.state_dict(), save_dir)
+
+    
+    def aggregate_multi_hot(self, EMdict, data):
+        '''
+        Aggregate multi-hot feature via weighted average.
+        
+        Input:
+        - EMdict: the embedding dict of feature.
+        - data: data of the feature. #shape(bs, voca_size)
+        
+        Output:
+        - res: #shape(bs, embedding_dim)
+        '''
+        index_vector = np.linspace(0, data.shape[1]-1)  # (voca_size)
+        index_vector = np.tile(index_vector, (data.shape[0], 1))    # (bs, voca_size)
+        index_vector = self._move_device(torch.LongTensor(index_vector))
+        index_vector = EMdict(index_vector)
+        data = data.unsqueeze(2)
+        res = data * index_vector   # (bs, voca_size, embedding_dim)
+        res = torch.sum(res, axis=1, keepdim=False) # (bs, embedding_dim)
+
+        return data
 
 
 

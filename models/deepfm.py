@@ -10,6 +10,7 @@
 # here put the import lib
 from collections import OrderedDict
 from models.basemodel import BaseModel
+from models.layers.input import *
 import torch
 import torch.nn as nn
 
@@ -17,6 +18,8 @@ import torch.nn as nn
 class DeepFM(BaseModel):
     def __init__(self, args, feat_list, data_generator):
         super(DeepFM, self).__init__(args, data_generator=data_generator)
+        
+        self.feat_list = feat_list
         
         self.EMdict = nn.ModuleDict({})
         self.FMLinear = nn.ModuleDict({})
@@ -44,9 +47,15 @@ class DeepFM(BaseModel):
         EMlist = []
         fmlinear = 0
         '''get embedding list'''
-        for key in x.keys():
-            EMlist.append(self.EMdict[key](x[key].long()))
-            fmlinear += self.FMLinear[key](x[key].long())  # (bs, 1)
+        for feat in self.feat_list:
+            if isinstance(feat, sparseFeat):
+                EMlist.append(self.EMdict[feat.feat_name](x[feat.feat_name].long()))
+                fmlinear += self.FMLinear[feat.feat_name](x[feat.feat_name].long())  # (bs, 1)
+            elif isinstance(feat, sequenceFeat):
+                EMlist.append(self.aggregate_multi_hot(self.EMdict[feat.feat_name], x[feat.feat_name].long()))
+                fmlinear += self.aggregate_multi_hot(self.EMdict[feat.feat_name], x[feat.feat_name].long())
+            else:
+                raise ValueError
         
         
         '''FM'''

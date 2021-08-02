@@ -20,12 +20,17 @@ def run_DeepFM(args):
         info = json.load(f)
 
     '''Step 1: Create item feat and user feat and feature list'''
-    user_feats = ['user_id', 'user_device', 'user_system', 'user_province', 'user_city']
+    user_feats = ['user_id', 'user_device', 'user_system', 'user_province', 'user_city', 'user_age', 'user_gender']
     item_feats = ['item_id', 'item_picture', 'item_cluster1']
     train_feats = ['network', 'refresh']
     feat_list = []
     for feat in user_feats + item_feats + train_feats:
-        feat_list.append(sparseFeat(feat, info['vocabulary_size'][feat], args.em_dim))
+        if feat in info['feat_type']['sparse']:
+            feat_list.append(sparseFeat(feat, info['vocabulary_size'][feat], args.em_dim))
+        elif feat in info['feat_type']['multi-hot']:
+            feat_list.append(sequenceFeat(feat, info['vocabulary_size'][feat], args.em_dim))
+        else:
+            raise ValueError
 
     '''Step 2: Data generator'''
     data_generator = DataGenerator(args, user_feats, item_feats, train_feats)

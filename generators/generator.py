@@ -19,7 +19,8 @@ from torch.utils.data import Dataset, DataLoader
 
 class RecData(Dataset):
     '''Input torch tensor for taking out data.'''
-    def __init__(self, inter, user_feature, item_feature, uid, iid, mode='train'):
+    def __init__(self, inter, user_feature, item_feature, uid, iid, 
+                 feat_list, mode='train'):
         super().__init__()
         self.inter = inter
         self.user_feature = user_feature
@@ -27,6 +28,7 @@ class RecData(Dataset):
         self.uid_dict = uid
         self.iid_dict = iid
         self.mode = mode
+        self.feat_list = feat_list
 
     def __len__(self):
 
@@ -34,11 +36,11 @@ class RecData(Dataset):
 
     def __getitem__(self, index):
 
-        instance = self._merge_features(self.inter[index])
+        instance, instance_multi = self._merge_features(self.inter[index])
         if self.mode == 'train':
-            return torch.LongTensor(instance[:-1]), torch.Tensor([instance[-1]])
+            return torch.LongTensor(instance[:-1]), torch.LongTensor(instance_multi), torch.FloatTensor([instance[-1]])
         elif self.mode == 'test':
-            return torch.LongTensor(instance)
+            return torch.LongTensor(instance), torch.LongTensor(instance_multi)
         else:
             raise ValueError
 
@@ -50,18 +52,21 @@ class RecData(Dataset):
         item_id = self.iid_dict[inter[1]]
         # 取训练集中的其他特征
         label = list(inter[2:])
-        user_feature = list(self.user_feature[user_id])
+        user_feature = list(self.user_feature[user_id][:-2])
         item_feature = list(self.item_feature[item_id])
         instance = user_feature + item_feature + label
+        instance_multi = list(self.user_feature[user_id][-2:])
 
-        return np.array(instance)
+        return instance, instance_multi
 
 
 
 class DataGenerator():
     '''Generate data for model.'''
-    def __init__(self, args, user_feats=['user_id'], item_feats=['item_id'], train_feats=[], mode='offline'):
+    def __init__(self, args, feat_list, user_feats=['user_id'], 
+                 item_feats=['item_id'], train_feats=[], mode='offline'):
 
+        self.feat_list = feat_list
         self.mode = mode
         self.args = args
         self.data_path = './data/'
@@ -123,7 +128,7 @@ class DataGenerator():
         print('Make train data...')
 
         trainset = RecData(self.train, self.user_feature, self.item_feature,
-                           self.uid_dict, self.iid_dict)
+                           self.uid_dict, self.iid_dict, self.feat_list)
 
         return DataLoader(trainset, 
                           batch_size=self.args.bs,
@@ -140,10 +145,10 @@ class DataGenerator():
         if self.mode == 'offline':
             index = random.choices(list(range(len(self.test))), k=50000)
             testset = RecData(self.test[index], self.user_feature, self.item_feature,
-                              self.uid_dict, self.iid_dict)
+                              self.uid_dict, self.iid_dict, self.feat_list)
         elif self.mode == 'online':
             testset = RecData(self.test, self.user_feature, self.item_feature,
-                              self.uid_dict, self.iid_dict, mode='test')
+                              self.uid_dict, self.iid_dict, self.feat_list, mode='test')
         # set the max batch size
         bs = min(testset.__len__(), 10000)
 
@@ -163,17 +168,26 @@ def collate_point(data, features=['user_id', 'item_id'], mode='offline'):
 
     if mode == 'offline':
         x = list(map(lambda x: x[0], data)) # take out features
+        x_multi = list(map(lambda x: x[1], data))
     elif mode == 'online':
-        x = data
+        #x = data
+        x = list(map(lambda x: x[0], data)) # take out features
+        x_multi = list(map(lambda x: x[1], data))
     else:
         raise ValueError
 
     x = torch.stack(x)  # (bs, feat_num)
+    features.remove('user_age')
+    features.remove('user_gender')
     for i, feat in enumerate(features):
-        batch_data[feat] = x[:, i].long()
+        batch_data[feat] = torch.LongTensor(x[:, i])
+
+    for i, feat in enumerate(['user_age', 'user_gender']):
+        batch_data[feat] = torch.LongTensor(x_multi[:, i])
 
     if mode == 'offline':
-        y = list(map(lambda x: x[1], data))
+        y = list(map(lambda x: x[2], data))
+        y = torch.FloatTensor(y)
         y = torch.stack(y)  # (bs, 1)
         #y = y.unsqueeze(1)
         return batch_data, y

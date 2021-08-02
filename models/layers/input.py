@@ -45,12 +45,9 @@ class denseFeat():
         @ index: the index of current feature in data(.pkl)
         @ group_name: can be used to group feature
     '''
-    def __init__(self, feat_name, index, group_name=None, loc=None) -> None:
+    def __init__(self, feat_name) -> None:
         super().__init__()
         self.feat_name = feat_name
-        self.index = index
-        self.group_name = group_name
-        self.loc = loc
 
 
 class sequenceFeat():
@@ -64,13 +61,9 @@ class sequenceFeat():
         @ embedding_dim: the dimension of embedding layer output
         @ group_name: can be used to group feature
     '''
-    def __init__(self, feat_name, vocabulary_size, index, embedding_dim=8,
-        group_name=None, loc=None) -> None:
+    def __init__(self, feat_name, vocabulary_size, embedding_dim=8, ) -> None:
         super().__init__()
         self.feat_name = feat_name
         self.vocabulary_size = vocabulary_size
         self.embedding_dim = embedding_dim
-        self.group_name = group_name
-        self.index = index
-        self.loc = None
 
