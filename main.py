@@ -53,23 +53,16 @@ parser.add_argument('-bn', default=0, type=bool,
 parser.add_argument('-init', default='normal', 
                     choices=['normal', 'kaiming'], 
                     help='how initialize the neural network')
-parser.add_argument('-train-test', default=0.9, type=float, 
-                    help='the ratio of training size in whole dataset')
-parser.add_argument('-train-val', default=0.9, type=float, 
-                    help='the ratio of training size in training dataset')
-parser.add_argument('-scale', default=1, type=int, 
-                    help='wheather scale the x of dataset')
 parser.add_argument('-load-m', default=False, action='store_true',
                     help='wheather load model rather than training.')
 parser.add_argument('-bpr', default=False, action='store_true',
                     help='whether use bpr loss')
+parser.add_argument('-online', default=False, action='store_true',
+                    help='whether train online')
 
 '''The arguments about log'''
 parser.add_argument('-log', default=False, action='store_true', 
                     help='whether log the experiment.')
-parser.add_argument('-log-path', default='default', 
-                    choices=['default', 'time'], 
-                    help='where is the log')
 parser.add_argument('-batch-record', default=1000, type=int, 
                     help='output record once pre <batch-record> batches')
 
@@ -81,25 +74,10 @@ parser.add_argument('-use-cuda', default=False, action='store_true',
                     help='whether use cuda')
 parser.add_argument('-device-tab', default=0, type=int, 
                     help="specify the device number. note how many gpus you have.")
-parser.add_argument('-task', type=str, default='classification',
-                    choices=['classification', 'regression'], 
-                    help='the task of output layer')
 
 '''The arguments about specified model'''
 parser.add_argument('-em-dim', default=16, type=int,
                     help='the dimension of embedding')
-parser.add_argument('-alpha', default=0.1, type=float,
-                    help='hyper-parameter')
-parser.add_argument('-beta', default=0.1, type=float,
-                    help='hyper-parameter')
-parser.add_argument('-gamma', default=0.01, type=float,
-                    help='hyper-parameter')
-parser.add_argument('-loss-decay', default=0.9, type=float, 
-                    help='the decay of auxiliary task weight')
-parser.add_argument('-margin-decay', default=0.9, type=float,
-                    help='the decay of sample margin')
-parser.add_argument('-episilon', default=0.00015, type=float,
-                    help='the hyperparameter for label smoothing')
 
 
 
@@ -133,7 +111,12 @@ def main(args, mode='offline'):
         model.to('cuda:' + str(args.device_tab))
 
     '''Step 3: train model or load model'''
-    model.fit(mode)
+    if mode == 'offline':
+        auc = model.fit(mode)
+    elif mode == 'online':
+        model.fit(mode)
+    else:
+        raise ValueError
 
     if mode == 'online':
         model_path = './save_model/' + args.m + '.ckpt'
@@ -147,8 +130,15 @@ def main(args, mode='offline'):
 
         with torch.no_grad():
             submit(data_generator, model)
+    elif mode == 'offline':
+        return auc
+    else:
+        raise ValueError
+
 
     print('Mission Complete!')
+
+    
 
 
 def submit(DG, model):
@@ -164,7 +154,6 @@ def submit(DG, model):
     df = pd.DataFrame({'id': list(range(1, 50001)), 'label': y})
     now_str = time.strftime("%m%d%H%M", time.localtime())
     df.to_csv('./submission/' + now_str + '.csv', index=False, header=False)
-    
 
 
 
@@ -172,5 +161,10 @@ if __name__ == '__main__':
 
     setproctitle.setproctitle("Qidong's Competition")
     args = parser.parse_args()
-    main(args, mode='offline')
+
+    # 是否线上训练
+    if args.online:
+        main(args, mode='online')
+    else:
+        main(args, mode='offline')
 

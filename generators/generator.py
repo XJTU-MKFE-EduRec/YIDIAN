@@ -36,11 +36,11 @@ class RecData(Dataset):
 
     def __getitem__(self, index):
 
-        instance, instance_multi = self._merge_features(self.inter[index])
+        instance, instance_age, instance_gender = self._merge_features(self.inter[index])
         if self.mode == 'train':
-            return torch.LongTensor(instance[:-1]), torch.LongTensor(instance_multi), torch.FloatTensor([instance[-1]])
+            return torch.LongTensor(instance[:-1]), torch.FloatTensor(instance_age), torch.FloatTensor(instance_gender), torch.FloatTensor([instance[-1]])
         elif self.mode == 'test':
-            return torch.LongTensor(instance), torch.LongTensor(instance_multi)
+            return torch.LongTensor(instance), torch.FloatTensor(instance_age), torch.FloatTensor(instance_gender)
         else:
             raise ValueError
 
@@ -55,9 +55,10 @@ class RecData(Dataset):
         user_feature = list(self.user_feature[user_id][:-2])
         item_feature = list(self.item_feature[item_id])
         instance = user_feature + item_feature + label
-        instance_multi = list(self.user_feature[user_id][-2:])
+        instance_age = list(self.user_feature[user_id][-2])
+        instance_gender = list(self.user_feature[user_id][-1])
 
-        return instance, instance_multi
+        return instance, instance_age, instance_gender
 
 
 
@@ -73,6 +74,8 @@ class DataGenerator():
         self._load_data()
         self._map_features(user_feats, item_feats)
         self.features = user_feats + item_feats + train_feats
+        self.features.remove('user_age')
+        self.features.remove('user_gender')
         
         
     def _load_data(self):
@@ -168,28 +171,28 @@ def collate_point(data, features=['user_id', 'item_id'], mode='offline'):
 
     if mode == 'offline':
         x = list(map(lambda x: x[0], data)) # take out features
-        x_multi = list(map(lambda x: x[1], data))
+        x_age = list(map(lambda x: x[1], data))
+        x_gender = list(map(lambda x: x[2], data))
     elif mode == 'online':
         #x = data
         x = list(map(lambda x: x[0], data)) # take out features
-        x_multi = list(map(lambda x: x[1], data))
+        x_age = list(map(lambda x: x[1], data))
+        x_gender = list(map(lambda x: x[2], data))
     else:
         raise ValueError
 
     x = torch.stack(x)  # (bs, feat_num)
-    features.remove('user_age')
-    features.remove('user_gender')
     for i, feat in enumerate(features):
-        batch_data[feat] = torch.LongTensor(x[:, i])
+        batch_data[feat] = x[:, i]
 
-    for i, feat in enumerate(['user_age', 'user_gender']):
-        batch_data[feat] = torch.LongTensor(x_multi[:, i])
+    batch_data['user_age'] = torch.stack(x_age)
+    batch_data['user_gender'] = torch.stack(x_gender)
 
     if mode == 'offline':
-        y = list(map(lambda x: x[2], data))
+        y = list(map(lambda x: x[3], data))
         y = torch.FloatTensor(y)
-        y = torch.stack(y)  # (bs, 1)
-        #y = y.unsqueeze(1)
+        #y = torch.stack(y)  # (bs, 1)
+        y = y.unsqueeze(1)
         return batch_data, y
 
     elif mode == 'online':

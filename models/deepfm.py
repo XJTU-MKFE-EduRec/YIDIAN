@@ -52,8 +52,8 @@ class DeepFM(BaseModel):
                 EMlist.append(self.EMdict[feat.feat_name](x[feat.feat_name].long()))
                 fmlinear += self.FMLinear[feat.feat_name](x[feat.feat_name].long())  # (bs, 1)
             elif isinstance(feat, sequenceFeat):
-                EMlist.append(self.aggregate_multi_hot(self.EMdict[feat.feat_name], x[feat.feat_name].long()))
-                fmlinear += self.aggregate_multi_hot(self.EMdict[feat.feat_name], x[feat.feat_name].long())
+                EMlist.append(self.aggregate_multi_hot(self.EMdict[feat.feat_name], x[feat.feat_name]))
+                fmlinear += self.aggregate_multi_hot(self.FMLinear[feat.feat_name], x[feat.feat_name])
             else:
                 raise ValueError
         

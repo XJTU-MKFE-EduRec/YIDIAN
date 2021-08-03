@@ -82,6 +82,9 @@ class BaseModel(nn.Module):
             # log the best iteration and the best metrics
             self.logger.info('The best iteration is %d', self.best_iteration)
             self.logger.info('The best result is ' + str(main_metric[self.best_iteration]))
+            self._end_log()
+
+            return main_metric[self.best_iteration]
 
 
     def __train_one_epoch__(self, epoch, train_loader):
@@ -271,15 +274,15 @@ class BaseModel(nn.Module):
         Output:
         - res: #shape(bs, embedding_dim)
         '''
-        index_vector = np.linspace(0, data.shape[1]-1)  # (voca_size)
+        index_vector = np.array(range(data.shape[1]))  # (voca_size)
         index_vector = np.tile(index_vector, (data.shape[0], 1))    # (bs, voca_size)
         index_vector = self._move_device(torch.LongTensor(index_vector))
-        index_vector = EMdict(index_vector)
+        index_vector = EMdict(index_vector) # (bs, voca_size, embedding_dim)
         data = data.unsqueeze(2)
         res = data * index_vector   # (bs, voca_size, embedding_dim)
         res = torch.sum(res, axis=1, keepdim=False) # (bs, embedding_dim)
 
-        return data
+        return res
 
 
 
