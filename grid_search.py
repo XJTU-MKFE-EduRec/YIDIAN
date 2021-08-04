@@ -83,19 +83,20 @@ if __name__ == '__main__':
     if not os.path.exists(log_path):
         os.mkdir(log_path)
 
-    f = open(log_path+args.m+'.txt', 'w+')
+    f = open(log_path+args.m+'-bs.txt', 'w+')
 
     l = []
 
     best_model = {'auc': 0}
-    for bs in [1024, 2048, 4096]:
+    for bs in [4096, 8192, 16384, 32768]:
         for lr in [0.001, 0.0001]:
-            for em in [8, 16, 32]:
+            for em in [16]:
                 args.bs = bs
                 args.lr = lr
                 args.em_dim = em
                 auc = main(args, 'offline')
                 f.writelines(str({'batch_size': bs, 'lr': lr, 'embedding_size': em, 'auc': auc}))
+                f.writelines('\n')
                 if auc > best_model['auc']:
                     best_model['auc'] = auc
                     best_model['batch_size'] = bs

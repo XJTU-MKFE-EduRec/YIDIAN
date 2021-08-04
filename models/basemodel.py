@@ -81,10 +81,10 @@ class BaseModel(nn.Module):
             self.best_iteration = main_metric[0][1]
             # log the best iteration and the best metrics
             self.logger.info('The best iteration is %d', self.best_iteration)
-            self.logger.info('The best result is ' + str(main_metric[self.best_iteration]))
+            self.logger.info('The best result is ' + str(main_metric[0]))
             self._end_log()
 
-            return main_metric[self.best_iteration]
+            return main_metric[0][0]
 
 
     def __train_one_epoch__(self, epoch, train_loader):
