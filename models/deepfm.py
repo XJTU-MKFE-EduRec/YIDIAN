@@ -11,6 +11,7 @@
 from collections import OrderedDict
 from models.basemodel import BaseModel
 from models.layers.input import *
+from utils.utils import load_title
 import torch
 import torch.nn as nn
 
@@ -27,9 +28,13 @@ class DeepFM(BaseModel):
         for feat in feat_list:
             self.FMLinear[feat.feat_name] = nn.Embedding(feat.vocabulary_size, 1)
             self.EMdict[feat.feat_name] = nn.Embedding(feat.vocabulary_size, feat.embedding_dim)
+            input_size += feat.embedding_dim
             nn.init.normal_(self.FMLinear[feat.feat_name].weight, mean=0.0, std=0.0001)
             nn.init.normal_(self.EMdict[feat.feat_name].weight, mean=0.0, std=0.0001)
-            input_size += feat.embedding_dim
+
+        self.EMdict['item_title'] = nn.Embedding.from_pretrained(load_title())
+        self.EMdict['item_title'].requires_grad = False
+        input_size += 32
         
         self.dnn = nn.Sequential(OrderedDict([
             ('L1', nn.Linear(input_size, 200)),
@@ -66,6 +71,7 @@ class DeepFM(BaseModel):
         yFM += fmlinear
 
         '''DNN'''
+        EMlist.append(self.EMdict['item_title'](x['item_id'].long()))
         in_dnn = torch.cat(EMlist, dim=1)    # (bs, em_dim*feat_num)
         yDNN = self.dnn(in_dnn) # (bs, 1)
 

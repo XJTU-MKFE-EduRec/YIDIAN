@@ -51,7 +51,8 @@ class BaseModel(nn.Module):
         optim_ = select_optimizer(self.args.optimizer)
         schedule_ = select_schedule(self.args.lr_type)
         
-        self.optimizer = optim_(params=model.parameters(), lr=self.args.lr)
+        self.optimizer = optim_(params=filter(lambda x: x.requires_grad, model.parameters()), 
+                                lr=self.args.lr)
         if schedule_ is not None:
             self.scheduler = schedule_(self.optimizer, 
                                   gamma=self.args.lr_decay, 
@@ -73,7 +74,6 @@ class BaseModel(nn.Module):
 
             if schedule_ is not None:
                 self.scheduler.step()
-            #TODO:重新实现early stop
         
         if mode == 'offline':
             '''get best iteration according to main metric on validation'''
@@ -233,7 +233,6 @@ class BaseModel(nn.Module):
         check_dir = r'./save_model/' + self.args.m + '/'
         best_path = check_dir + 'epoch_' + str(self.best_iteration) + '.ckpt'
         self.load_state_dict(torch.load(best_path))
-        #TODO:删除所有checkpoint,并把最好的模型存储下来
 
         '''remove all checkpoint files'''
         #for f in os.listdir(check_dir):

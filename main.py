@@ -91,7 +91,7 @@ def main(args, mode='offline'):
     '''Step 1: Create item feat and user feat and feature list'''
     user_feats = ['user_id', 'user_device', 'user_system', 'user_province', 'user_city', 'user_age', 'user_gender']
     item_feats = ['item_id', 'item_picture', 'item_cluster1', 'item_cluster2']
-    train_feats = ['network', 'refresh', 'hour', 'interval']
+    train_feats = ['network', 'refresh']
     feat_list = []
     for feat in user_feats + item_feats + train_feats:
         if feat in info['feat_type']['sparse']:
