@@ -12,7 +12,7 @@ import pickle
 import torch
 
 def load_title():
-    with open(r'./data/title_32.pkl', 'rb') as f:
+    with open(r'./data/title_16.pkl', 'rb') as f:
         title_em = pickle.load(f)
 
     title_em = torch.tensor(title_em).float()

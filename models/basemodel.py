@@ -69,7 +69,7 @@ class BaseModel(nn.Module):
             # 不要带梯度, 否则不自动清除的话会爆显存
             if mode == 'offline':
                 with torch.no_grad():
-                    auc = self._evaluate(validation_loader)
+                    auc = self._evaluate()
                     main_metric.append((auc, epoch))
 
             if schedule_ is not None:
@@ -80,7 +80,7 @@ class BaseModel(nn.Module):
             main_metric = sorted(main_metric, key=lambda x: x[0], reverse=True)
             self.best_iteration = main_metric[0][1]
             # log the best iteration and the best metrics
-            self.logger.info('The best iteration is %d', self.best_iteration)
+            self.logger.info('The best iteration is %d', self.best_iteration+1)
             self.logger.info('The best result is ' + str(main_metric[0]))
             self._end_log()
 
@@ -125,7 +125,7 @@ class BaseModel(nn.Module):
                 t_loss, t_auc = 0, 0
 
     
-    def _evaluate(self, loader):
+    def _evaluate(self):
         '''
         Evaluate the model using rank criterion.
         - Input: 
@@ -138,18 +138,24 @@ class BaseModel(nn.Module):
 
         self.logger.info('************** Validation Rank Evaluation **************')
         
-        y, y_ = self._move_device(torch.Tensor()), self._move_device(torch.Tensor())
-        for batch in tqdm(loader):
-            x, batch_y = self._move_device(batch[0]), self._move_device(batch[1])
-            batch_y_ = model(x)
-            y = torch.cat([y, batch_y], dim=0)
-            y_ = torch.cat([y_, batch_y_], dim=0)
+        auc = []
+        for i in range(10):
+            loader = self.data_generator.make_test_loader()
+            y, y_ = self._move_device(torch.Tensor()), self._move_device(torch.Tensor())
+            for batch in tqdm(loader):
+                x, batch_y = self._move_device(batch[0]), self._move_device(batch[1])
+                batch_y_ = model(x)
+                y = torch.cat([y, batch_y], dim=0)
+                y_ = torch.cat([y_, batch_y_], dim=0)
 
-        auc = evaluate_auc(y, y_)
+            auc.append(evaluate_auc(y, y_))
 
-        self.logger.info('The validation AUC: %.5f' % auc)
+            self.logger.info('The %dth validation AUC: %.5f' % (i+1, auc[i]))
         
-        return auc
+        mean_auc = sum(auc) / len(auc)
+        self.logger.info('The mean validation AUC: %.5f' % mean_auc)
+        
+        return mean_auc
 
     
     def _initialize_parameters(self, model, init_std=0.0001):

@@ -1,7 +1,7 @@
 # -*- encoding: utf-8 -*-
 '''
-@File    :   deepfm.py
-@Time    :   2021/05/24 23:05:22
+@File    :   xdeepfm.py
+@Time    :   2021/08/11 14:58:23
 @Author  :   Liu Qidong
 @Version :   1.0
 @Contact :   dong_liuqi@163.com
@@ -16,9 +16,9 @@ import torch
 import torch.nn as nn
 
 
-class DeepFM(BaseModel):
+class xDeepFM(BaseModel):
     def __init__(self, args, feat_list, data_generator):
-        super(DeepFM, self).__init__(args, data_generator=data_generator)
+        super(xDeepFM, self).__init__(args, data_generator=data_generator)
         
         self.feat_list = feat_list
         
@@ -31,12 +31,18 @@ class DeepFM(BaseModel):
             input_size += feat.embedding_dim
             nn.init.normal_(self.FMLinear[feat.feat_name].weight, mean=0.0, std=0.0001)
             nn.init.normal_(self.EMdict[feat.feat_name].weight, mean=0.0, std=0.0001)
-
-        self.EMdict['item_title'] = nn.Embedding.from_pretrained(load_title())
-        self.EMdict['item_title'].requires_grad = False
-        input_size += 16
         
-        self.dnn = nn.Sequential(OrderedDict([
+        self.dnnCTR = nn.Sequential(OrderedDict([
+            ('L1', nn.Linear(input_size, 200)),
+            #('BN1', nn.BatchNorm1d(200, momentum=0.5)),
+            ('act1', nn.ReLU()),
+            ('L2', nn.Linear(200, 200)), 
+            #('BN1', nn.BatchNorm1d(200, momentum=0.5)),
+            ('act2', nn.ReLU()),
+            ('L3', nn.Linear(200, 1, bias=False))
+        ]))
+
+        self.dnnCVR = nn.Sequential(OrderedDict([
             ('L1', nn.Linear(input_size, 200)),
             #('BN1', nn.BatchNorm1d(200, momentum=0.5)),
             ('act1', nn.ReLU()),
@@ -46,7 +52,8 @@ class DeepFM(BaseModel):
             ('L3', nn.Linear(200, 1, bias=False))
         ]))
         
-        self.out = nn.Sigmoid()
+        self.outCTR = nn.Sigmoid()
+        self.outCVR = nn.Sigmoid()
 
     def forward(self, x):
         EMlist = []
@@ -63,7 +70,7 @@ class DeepFM(BaseModel):
                 raise ValueError
         
         
-        '''FM'''
+        '''CIN'''
         in_fm = torch.stack(EMlist, dim=1) # (bs, feat_num, em_dim)
         square_of_sum = torch.pow(torch.sum(in_fm, dim=1), 2)  # (bs, em_dim)
         sum_of_square = torch.sum(in_fm ** 2, dim=1)    # (bs, em_dim)
@@ -71,11 +78,18 @@ class DeepFM(BaseModel):
         yFM += fmlinear
 
         '''DNN'''
-        EMlist.append(self.EMdict['item_title'](x['item_id'].long()))
         in_dnn = torch.cat(EMlist, dim=1)    # (bs, em_dim*feat_num)
         yDNN = self.dnn(in_dnn) # (bs, 1)
 
         y = self.out(yFM + yDNN)
 
         return y.float()
+
+
+
+
+
+
+
+
 
