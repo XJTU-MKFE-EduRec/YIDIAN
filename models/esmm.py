@@ -109,7 +109,7 @@ class ESMM(BaseModel):
             criterion_cvr = select_loss('mse')
             loss_ctr = criterion_ctr(yctr_, y['ctr'])
             loss_cvr = criterion_cvr(ycvr_, y['cvr'])
-            loss = loss_ctr + 0.001 * loss_cvr
+            loss = loss_ctr + self.args.labda * loss_cvr
             
             self.optimizer.zero_grad()
             loss.backward()

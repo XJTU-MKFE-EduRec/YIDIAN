@@ -8,7 +8,7 @@
 '''
 
 # here put the import lib
-from main import main
+from main_MT import main
 import os
 import argparse
 import setproctitle
@@ -21,7 +21,7 @@ parser = argparse.ArgumentParser(description='Input args')
 
 '''The arguments about model and training'''
 parser.add_argument('-m', default='fm', 
-                    choices=['fm', 'deepfm', 'mf'], help='choose model')
+                    choices=['fm', 'deepfm', 'mf', 'esmm'], help='choose model')
 parser.add_argument('-dataset', default='ML1M', 
                     choices=['ML1M', 'Amazon', 'ML20M'], 
                     help='choose dataset')
@@ -53,6 +53,8 @@ parser.add_argument('-bpr', default=False, action='store_true',
                     help='whether use bpr loss')
 parser.add_argument('-online', default=False, action='store_true',
                     help='whether train online')
+parser.add_argument('-labda', default=0.1, type=float,
+                    help='the weight of auxiliary task')
 
 '''The arguments about log'''
 parser.add_argument('-log', default=False, action='store_true', 
@@ -88,20 +90,23 @@ if __name__ == '__main__':
     l = []
 
     best_model = {'auc': 0}
-    for bs in [4096, 8192, 16384, 32768]:
-        for lr in [0.001, 0.0001]:
-            for em in [16]:
-                args.bs = bs
-                args.lr = lr
-                args.em_dim = em
-                auc = main(args, 'offline')
-                f.writelines(str({'batch_size': bs, 'lr': lr, 'embedding_size': em, 'auc': auc}))
-                f.writelines('\n')
-                if auc > best_model['auc']:
-                    best_model['auc'] = auc
-                    best_model['batch_size'] = bs
-                    best_model['lr'] = lr
-                    best_model['embedding_size'] = em
+    for bs in [8192]:
+        for lr in [0.001]:
+            for em in [16, 32]:
+                for l in [0.1, 0.01, 0.0001]:
+                    args.bs = bs
+                    args.lr = lr
+                    args.em_dim = em
+                    args.labda = l
+                    auc = main(args, 'offline')
+                    f.writelines(str({'batch_size': bs, 'lr': lr, 'embedding_size': em, 'auc': auc, 'lambda': l}))
+                    f.writelines('\n')
+                    if auc > best_model['auc']:
+                        best_model['auc'] = auc
+                        best_model['batch_size'] = bs
+                        best_model['lr'] = lr
+                        best_model['embedding_size'] = em
+                        best_model['labda'] = l
 
     f.writelines('The best model is ' + str(best_model))
     f.close()

@@ -59,7 +59,7 @@ parser.add_argument('-bpr', default=False, action='store_true',
                     help='whether use bpr loss')
 parser.add_argument('-online', default=False, action='store_true',
                     help='whether train online')
-parser.add_argument('-lambda', default=0.001, type=float,
+parser.add_argument('-labda', default=0.1, type=float,
                     help='the weight of auxiliary task')
 
 '''The arguments about log'''
@@ -121,6 +121,7 @@ def main(args, mode='offline'):
         raise ValueError
 
     if mode == 'online':
+        '''
         model_path = './save_model/' + args.m + '.ckpt'
         if os.path.exists(model_path):
             model = ESMM(args, feat_list, data_generator)
@@ -129,6 +130,7 @@ def main(args, mode='offline'):
                 model.to('cuda:' + str(args.device_tab))
         else:
             model._save_model()
+        '''
 
         with torch.no_grad():
             submit(data_generator, model)

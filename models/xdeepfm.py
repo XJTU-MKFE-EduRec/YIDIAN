@@ -88,6 +88,14 @@ class xDeepFM(BaseModel):
 
 
 
+class CIN(BaseModel):
+    '''Compressed Interaction Network(CIN) used in xDeepFM'''
+    def __init__(self, args, feat_list, data_generator=None, 
+                 sub_module=False):
+        super(CIN, self).__init__(args, data_generator=data_generator, 
+                                  sub_module=sub_module)
+        
+        self.feat_list = feat_list
 
 
 

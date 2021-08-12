@@ -25,7 +25,8 @@ class BaseModel(nn.Module):
     The BaseModel of all of models.
 
     '''
-    def __init__(self, args, loss='bce', best_iteration=0, data_generator=None) -> None:
+    def __init__(self, args, loss='bce', best_iteration=0, 
+                 data_generator=None, sub_module=False) -> None:
         super().__init__()
         
         self.args = args
@@ -33,7 +34,8 @@ class BaseModel(nn.Module):
         self.best_iteration = best_iteration     # the iteration is used for test 
         self.data_generator = data_generator
         self.metrics = []
-        self._init_log()
+        if not sub_module:  # if model as submodule, do not init log
+            self._init_log()
 
     
     def fit(self, mode='offline'):
@@ -195,6 +197,8 @@ class BaseModel(nn.Module):
         # create file handler
         if self.args.log:
             log_path = './log/text/'+ self.args.m + '/bs' + str(self.args.bs) + '_lr' + str(self.args.lr) + '_dim' + str(self.args.em_dim) + '.txt'
+            if self.args.m == 'esmm':
+                log_path = './log/text/'+ self.args.m + '/bs' + str(self.args.bs) + '_lr' + str(self.args.lr) + '_dim' + str(self.args.em_dim) + '_lambda' + str(self.args.labda) + '.txt'
             self.fh = logging.FileHandler(log_path, mode='w', encoding='utf-8')
             self.fh.setLevel(logging.DEBUG)
             fm = logging.Formatter("%(asctime)s-%(message)s")
