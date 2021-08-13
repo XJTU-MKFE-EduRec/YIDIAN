@@ -12,6 +12,7 @@ import json
 from models.layers.input import *
 from models.deepfm import DeepFM
 from models.dnn import DNN
+from models.xdeepfm import xDeepFM
 from generators.generator import DataGenerator
 
 import os
@@ -28,7 +29,7 @@ parser = argparse.ArgumentParser(description='Input args')
 
 '''The arguments about model and training'''
 parser.add_argument('-m', default='fm', 
-                    choices=['fm', 'deepfm', 'mf', 'dnn'], help='choose model')
+                    choices=['dnn', 'deepfm', 'xdeepfm'], help='choose model')
 parser.add_argument('-dataset', default='ML1M', 
                     choices=['ML1M', 'Amazon', 'ML20M'], 
                     help='choose dataset')
@@ -110,10 +111,13 @@ def main(args, mode='offline'):
         Model = DNN
     elif args.m == 'deepfm':
         Model = DeepFM
+    elif args.m == 'xdeepfm':
+        Model = xDeepFM
     else:
         raise ValueError
 
-    model = Model(args, feat_list, data_generator)
+    cin_size = [10, 10, 10]
+    model = Model(args, cin_size, feat_list, data_generator)
 
     if args.use_cuda:
         model.to('cuda:' + str(args.device_tab))

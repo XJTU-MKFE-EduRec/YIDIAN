@@ -10,7 +10,7 @@
 # here put the import lib
 import json
 from models.layers.input import *
-from models.deepfm import DeepFM
+from models.xdeepfm import xDeepFM
 from generators.generator import DataGenerator
 
 
@@ -36,7 +36,7 @@ def run_DeepFM(args):
     data_generator = DataGenerator(args, user_feats, item_feats, train_feats)
 
     '''Step 3: construct model and use cuda'''
-    model = DeepFM(args, feat_list, data_generator)
+    model = xDeepFM(args, feat_list, data_generator)
 
     if args.use_cuda:
         model.to('cuda:' + str(args.device_tab))
