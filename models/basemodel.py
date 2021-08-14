@@ -196,9 +196,13 @@ class BaseModel(nn.Module):
         self.logger.setLevel(logging.DEBUG)  # must set
         # create file handler
         if self.args.log:
-            log_path = './log/text/'+ self.args.m + '/bs' + str(self.args.bs) + '_lr' + str(self.args.lr) + '_dim' + str(self.args.em_dim) + '.txt'
+            if self.args.online:
+                ol = '-online'
+            else:
+                ol = 'offline'
+            log_path = './log/text/'+ self.args.m + '/bs' + str(self.args.bs) + '_lr' + str(self.args.lr) + '_dim' + str(self.args.em_dim) + ol + '.txt'
             if self.args.m == 'esmm':
-                log_path = './log/text/'+ self.args.m + '/bs' + str(self.args.bs) + '_lr' + str(self.args.lr) + '_dim' + str(self.args.em_dim) + '_lambda' + str(self.args.labda) + '.txt'
+                log_path = './log/text/'+ self.args.m + '/bs' + str(self.args.bs) + '_lr' + str(self.args.lr) + '_dim' + str(self.args.em_dim) + '_lambda' + str(self.args.labda) + ol + '.txt'
             self.fh = logging.FileHandler(log_path, mode='w', encoding='utf-8')
             self.fh.setLevel(logging.DEBUG)
             fm = logging.Formatter("%(asctime)s-%(message)s")

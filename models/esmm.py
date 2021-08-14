@@ -10,6 +10,7 @@
 # here put the import lib
 from collections import OrderedDict
 from models.basemodel import BaseModel
+from models.xdeepfm import CINLayer
 from models.layers.input import *
 from utils.evaluation import evaluate_auc
 from utils.selection import *
@@ -19,7 +20,7 @@ from tqdm import tqdm
 
 
 class ESMM(BaseModel):
-    def __init__(self, args, feat_list, data_generator):
+    def __init__(self, args, cin_size, feat_list, data_generator):
         super(ESMM, self).__init__(args, data_generator=data_generator)
         
         self.feat_list = feat_list
@@ -57,6 +58,14 @@ class ESMM(BaseModel):
         self.outCTR = nn.Sigmoid()
         self.outCVR = nn.Sigmoid()
 
+        self.cin_list = nn.ModuleList([])
+        m = len(feat_list)
+        hk = m
+        for lsize in cin_size:
+            self.cin_list.append(CINLayer(m * hk, lsize))
+            hk = lsize
+        self.cin_linear = nn.Linear(sum(cin_size), 1)
+
 
     def forward(self, x):
         EMlist = []
@@ -73,17 +82,27 @@ class ESMM(BaseModel):
                 raise ValueError
         
         '''FM'''
-        in_fm = torch.stack(EMlist, dim=1) # (bs, feat_num, em_dim)
-        square_of_sum = torch.pow(torch.sum(in_fm, dim=1), 2)  # (bs, em_dim)
-        sum_of_square = torch.sum(in_fm ** 2, dim=1)    # (bs, em_dim)
-        yFM = 1 / 2 * torch.sum(square_of_sum - sum_of_square, dim=1, keepdim=True)   # (bs, 1)
-        yFM += fmlinear
+        #in_fm = torch.stack(EMlist, dim=1) # (bs, feat_num, em_dim)
+        #square_of_sum = torch.pow(torch.sum(in_fm, dim=1), 2)  # (bs, em_dim)
+        #sum_of_square = torch.sum(in_fm ** 2, dim=1)    # (bs, em_dim)
+        #yFM = 1 / 2 * torch.sum(square_of_sum - sum_of_square, dim=1, keepdim=True)   # (bs, 1)
+        #yFM += fmlinear
+        '''CIN'''
+        yCIN = []
+        x0 = torch.stack(EMlist, dim=1) # (bs, feat_num, em_dim)
+        xk = x0
+        for cin in self.cin_list:
+            cin_res = cin(x0, xk)   # (bs, hk, em_dim)
+            xk = cin_res
+            yCIN.append(torch.sum(cin_res, dim=2, keepdim=False))    # added vector (bs, hk)
+        yCIN = torch.cat(yCIN, dim=1)   # (bs, cin_size)
+        yCIN = self.cin_linear(yCIN)
 
         '''CTR model and CVR model'''
         input = torch.cat(EMlist, dim=1)    # (bs, em_dim*feat_num)
         yctr = self.mCTR(input) # (bs, 1)
         ycvr = self.mCVR(input)
-        yctr = self.outCTR(yctr+yFM)
+        yctr = self.outCTR(yctr+yCIN)
 
         yctcvr = yctr * ycvr
 

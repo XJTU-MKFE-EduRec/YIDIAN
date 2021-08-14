@@ -107,7 +107,8 @@ def main(args, mode='offline'):
     data_generator = MT_DataGenerator(args, feat_list, user_feats, item_feats, train_feats, mode)
 
     '''Step 3: construct model and use cuda'''
-    model = ESMM(args, feat_list, data_generator)
+    cin_size = [10, 10, 10]
+    model = ESMM(args, cin_size, feat_list, data_generator)
 
     if args.use_cuda:
         model.to('cuda:' + str(args.device_tab))

@@ -131,6 +131,7 @@ def main(args, mode='offline'):
         raise ValueError
 
     if mode == 'online':
+        '''
         model_path = './save_model/' + args.m + '.ckpt'
         if os.path.exists(model_path):
             model = Model(args, feat_list, data_generator)
@@ -139,6 +140,7 @@ def main(args, mode='offline'):
                 model.to('cuda:' + str(args.device_tab))
         else:
             model._save_model()
+        '''
 
         with torch.no_grad():
             submit(data_generator, model)
