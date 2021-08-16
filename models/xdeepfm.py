@@ -62,8 +62,12 @@ class xDeepFM(BaseModel):
                 EMlist.append(self.EMdict[feat.feat_name](x[feat.feat_name].long()))
                 yLINEAR += self.FMLinear[feat.feat_name](x[feat.feat_name].long())  # (bs, 1)
             elif isinstance(feat, sequenceFeat):
-                EMlist.append(self.aggregate_multi_hot(self.EMdict[feat.feat_name], x[feat.feat_name]))
-                yLINEAR += self.aggregate_multi_hot(self.FMLinear[feat.feat_name], x[feat.feat_name])
+                if feat.feat_name == 'keywords':
+                    EMlist.append(self.keyword_multi_hot(self.EMdict['keywords'], x['keywords'], x['keywords_p']))
+                    yLINEAR += self.keyword_multi_hot(self.FMLinear['keywords'], x['keywords'], x['keywords_p'])
+                else:
+                    EMlist.append(self.aggregate_multi_hot(self.EMdict[feat.feat_name], x[feat.feat_name]))
+                    yLINEAR += self.aggregate_multi_hot(self.FMLinear[feat.feat_name], x[feat.feat_name])
             else:
                 raise ValueError
         

@@ -36,11 +36,11 @@ class RecData(Dataset):
 
     def __getitem__(self, index):
 
-        instance, instance_age, instance_gender = self._merge_features(self.inter[index])
+        instance, instance_age, instance_gender, keywords, keywords_p = self._merge_features(self.inter[index])
         if self.mode == 'train':
-            return torch.LongTensor(instance[:-1]), torch.FloatTensor(instance_age), torch.FloatTensor(instance_gender), torch.FloatTensor([instance[-1]])
+            return torch.LongTensor(instance[:-1]), torch.FloatTensor(instance_age), torch.FloatTensor(instance_gender), torch.FloatTensor(keywords), torch.FloatTensor(keywords_p), torch.FloatTensor([instance[-1]])
         elif self.mode == 'test':
-            return torch.LongTensor(instance), torch.FloatTensor(instance_age), torch.FloatTensor(instance_gender)
+            return torch.LongTensor(instance), torch.FloatTensor(instance_age), torch.FloatTensor(instance_gender), torch.FloatTensor(keywords), torch.FloatTensor(keywords_p)
         else:
             raise ValueError
 
@@ -53,12 +53,18 @@ class RecData(Dataset):
         # 取训练集中的其他特征
         label = list(inter[2:])
         user_feature = list(self.user_feature[user_id][:-2])
-        item_feature = list(self.item_feature[item_id])
+        item_feature = list(self.item_feature[item_id][:-2])
         instance = user_feature + item_feature + label
+
+        # 处理user_age和user_gender
         instance_age = list(self.user_feature[user_id][-2])
         instance_gender = list(self.user_feature[user_id][-1])
 
-        return instance, instance_age, instance_gender
+        # 处理item_keywords
+        keywords = list(self.item_feature[item_id][-2])
+        keywords_p = list(self.item_feature[item_id][-1])
+
+        return instance, instance_age, instance_gender, keywords, keywords_p
 
 
 
@@ -76,6 +82,7 @@ class DataGenerator():
         self.features = user_feats + item_feats + train_feats
         self.features.remove('user_age')
         self.features.remove('user_gender')
+        self.features.remove('keywords')
         
         
     def _load_data(self):
@@ -103,10 +110,34 @@ class DataGenerator():
 
     def _map_features(self, user_feats, item_feats):
         '''Get features that will be used in model'''
-        self.user_feature = self.user_feature[user_feats]
-        self.item_feature = self.item_feature[item_feats]
-        self.user_feature = self.user_feature.to_numpy()
-        self.item_feature = self.item_feature.to_numpy()
+        #self.user_feature = self.user_feature[user_feats]
+        #self.item_feature = self.item_feature[item_feats]
+        #self.user_feature = self.user_feature.to_numpy()
+        #self.item_feature = self.item_feature.to_numpy()
+        if 'keywords' in item_feats:
+            # 特征keywords里面存的是list，需要变成40列（序列最长为40）, 用0补全
+            # fix_length 变成固定长度
+            self.item_feature['keywords'] = self.item_feature['keywords'].apply(lambda x: fix_length(x,40))
+            self.item_feature['keywords_p'] = self.item_feature['keywords_p'].apply(lambda x: fix_length(x,40))
+            '''
+            # 拼起来
+            keys = [] # 存keywords的label
+            keys_p = [] # 存keywords的概率
+            keywords_feat.apply(lambda x: keys.append(x))
+            keywords_p.apply(lambda x: keys_p.append(x))
+            '''
+            item_feats.append('keywords_p')
+            self.user_feature = self.user_feature[user_feats]
+            self.item_feature = self.item_feature[item_feats]
+            self.user_feature = self.user_feature.to_numpy()
+            self.item_feature = self.item_feature.to_numpy()
+            item_feats.remove('keywords_p')
+
+        else:
+            self.user_feature = self.user_feature[user_feats]
+            self.item_feature = self.item_feature[item_feats]
+            self.user_feature = self.user_feature.to_numpy()
+            self.item_feature = self.item_feature.to_numpy()
 
     
     def _merge_features(self, inter):
@@ -173,11 +204,15 @@ def collate_point(data, features=['user_id', 'item_id'], mode='offline'):
         x = list(map(lambda x: x[0], data)) # take out features
         x_age = list(map(lambda x: x[1], data))
         x_gender = list(map(lambda x: x[2], data))
+        keywords = list(map(lambda x: x[3], data))
+        keywords_p = list(map(lambda x: x[4], data))
     elif mode == 'online':
         #x = data
         x = list(map(lambda x: x[0], data)) # take out features
         x_age = list(map(lambda x: x[1], data))
         x_gender = list(map(lambda x: x[2], data))
+        keywords = list(map(lambda x: x[3], data))
+        keywords_p = list(map(lambda x: x[4], data))
     else:
         raise ValueError
 
@@ -187,9 +222,11 @@ def collate_point(data, features=['user_id', 'item_id'], mode='offline'):
 
     batch_data['user_age'] = torch.stack(x_age)
     batch_data['user_gender'] = torch.stack(x_gender)
+    batch_data['keywords'] = torch.stack(keywords)
+    batch_data['keywords_p'] = torch.stack(keywords_p)
 
     if mode == 'offline':
-        y = list(map(lambda x: x[3], data))
+        y = list(map(lambda x: x[5], data))
         y = torch.FloatTensor(y)
         #y = torch.stack(y)  # (bs, 1)
         y = y.unsqueeze(1)
@@ -198,4 +235,17 @@ def collate_point(data, features=['user_id', 'item_id'], mode='offline'):
     elif mode == 'online':
         return batch_data
     
+
+def fix_length(x,k):
+    # x 为输入的list，k为要变成的固定长度
+    if x == 'nan':
+        return np.zeros(40)
+    else:
+        if type(x[0]) == type('a'):
+            # 先归一化处理
+            x = list(map(float, x))
+            x = list(np.divide(x,sum(x)))
+        for i in range(len(x),k):
+            x.append(0)
+        return x
 

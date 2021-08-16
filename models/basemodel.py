@@ -297,6 +297,30 @@ class BaseModel(nn.Module):
 
         return res
 
+    
+    def keyword_multi_hot(self, EMdict, data, p_data):
+        '''
+        Aggregate multi-hot feature via weighted average.
+        
+        Input:
+        - EMdict: the embedding dict of feature.
+        - data: data of the feature. #shape(bs, voca_size)
+        - p_data: probability
+        
+        Output:
+        - res: #shape(bs, embedding_dim)
+        '''
+        #index_vector = np.array(data)  # (voca_size)
+        #index_vector = np.tile(index_vector, (data.shape[0], 1))    # (bs, voca_size)
+        index_vector = EMdict(data.long()) # (bs, voca_size, embedding_dim)
+        # 此处p为概率归一化后的
+        p_data = p_data.unsqueeze(2)
+        res = p_data * index_vector   # (bs, voca_size, embedding_dim)
+        res = torch.sum(res, axis=1, keepdim=False) # (bs, embedding_dim)
+
+        return res
+
+
 
 
 
