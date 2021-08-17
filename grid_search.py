@@ -8,7 +8,7 @@
 '''
 
 # here put the import lib
-from main_MT import main
+from main import main
 import os
 import argparse
 import setproctitle
@@ -21,7 +21,7 @@ parser = argparse.ArgumentParser(description='Input args')
 
 '''The arguments about model and training'''
 parser.add_argument('-m', default='fm', 
-                    choices=['fm', 'deepfm', 'mf', 'esmm'], help='choose model')
+                    choices=['fm', 'deepfm', 'mf', 'esmm', 'xdeepfm'], help='choose model')
 parser.add_argument('-dataset', default='ML1M', 
                     choices=['ML1M', 'Amazon', 'ML20M'], 
                     help='choose dataset')
@@ -93,20 +93,18 @@ if __name__ == '__main__':
     for bs in [8192]:
         for lr in [0.001]:
             for em in [16, 32]:
-                for l in [0.1, 0.01, 0.0001]:
+                for cs in [[10, 10, 10], [10, 10, 10, 10, 10], [20, 20, 20], [20, 20, 20, 20, 20]]:
                     args.bs = bs
                     args.lr = lr
                     args.em_dim = em
-                    args.labda = l
-                    auc = main(args, 'offline')
-                    f.writelines(str({'batch_size': bs, 'lr': lr, 'embedding_size': em, 'auc': auc, 'lambda': l}))
+                    auc = main(args, 'offline', cs)
+                    f.writelines(str({'batch_size': bs, 'lr': lr, 'embedding_size': em, 'auc': auc, 'cin_size': cs}))
                     f.writelines('\n')
                     if auc > best_model['auc']:
                         best_model['auc'] = auc
                         best_model['batch_size'] = bs
                         best_model['lr'] = lr
                         best_model['embedding_size'] = em
-                        best_model['labda'] = l
 
     f.writelines('The best model is ' + str(best_model))
     f.close()
