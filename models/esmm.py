@@ -66,6 +66,14 @@ class ESMM(BaseModel):
             hk = lsize
         self.cin_linear = nn.Linear(sum(cin_size), 1)
 
+        self.cin_list_d = nn.ModuleList([])
+        m = len(feat_list)
+        hk = m
+        for lsize in cin_size:
+            self.cin_list_d.append(CINLayer(m * hk, lsize))
+            hk = lsize
+        self.cin_linear_d = nn.Linear(sum(cin_size), 1)
+
 
     def forward(self, x):
         EMlist = []
@@ -76,8 +84,12 @@ class ESMM(BaseModel):
                 EMlist.append(self.EMdict[feat.feat_name](x[feat.feat_name].long()))
                 fmlinear += self.FMLinear[feat.feat_name](x[feat.feat_name].long())  # (bs, 1)
             elif isinstance(feat, sequenceFeat):
-                EMlist.append(self.aggregate_multi_hot(self.EMdict[feat.feat_name], x[feat.feat_name]))
-                fmlinear += self.aggregate_multi_hot(self.FMLinear[feat.feat_name], x[feat.feat_name])
+                if feat.feat_name == 'keywords':
+                    EMlist.append(self.keyword_multi_hot(self.EMdict['keywords'], x['keywords'], x['keywords_p']))
+                    fmlinear += self.keyword_multi_hot(self.FMLinear['keywords'], x['keywords'], x['keywords_p'])
+                else:
+                    EMlist.append(self.aggregate_multi_hot(self.EMdict[feat.feat_name], x[feat.feat_name]))
+                    fmlinear += self.aggregate_multi_hot(self.FMLinear[feat.feat_name], x[feat.feat_name])
             else:
                 raise ValueError
         
@@ -98,11 +110,22 @@ class ESMM(BaseModel):
         yCIN = torch.cat(yCIN, dim=1)   # (bs, cin_size)
         yCIN = self.cin_linear(yCIN)
 
+        yCIN_d = []
+        x0 = torch.stack(EMlist, dim=1) # (bs, feat_num, em_dim)
+        xk = x0
+        for cin in self.cin_list_d:
+            cin_res = cin(x0, xk)   # (bs, hk, em_dim)
+            xk = cin_res
+            yCIN_d.append(torch.sum(cin_res, dim=2, keepdim=False))    # added vector (bs, hk)
+        yCIN_d = torch.cat(yCIN_d, dim=1)   # (bs, cin_size)
+        yCIN_d = self.cin_linear(yCIN_d)
+
         '''CTR model and CVR model'''
         input = torch.cat(EMlist, dim=1)    # (bs, em_dim*feat_num)
         yctr = self.mCTR(input) # (bs, 1)
         ycvr = self.mCVR(input)
         yctr = self.outCTR(yctr+yCIN)
+        ycvr += yCIN_d
 
         yctcvr = yctr * ycvr
 

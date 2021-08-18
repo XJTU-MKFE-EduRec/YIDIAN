@@ -92,8 +92,8 @@ if __name__ == '__main__':
     best_model = {'auc': 0}
     for bs in [8192]:
         for lr in [0.001]:
-            for em in [16, 32]:
-                for cs in [[10, 10, 10], [10, 10, 10, 10, 10], [20, 20, 20], [20, 20, 20, 20, 20]]:
+            for em in [64, 128, 128, 256, 512]:
+                for cs in [[20, 20, 20]]:
                     args.bs = bs
                     args.lr = lr
                     args.em_dim = em

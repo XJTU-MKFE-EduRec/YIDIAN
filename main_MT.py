@@ -92,7 +92,7 @@ def main(args, mode='offline'):
 
     '''Step 1: Create item feat and user feat and feature list'''
     user_feats = ['user_id', 'user_device', 'user_system', 'user_province', 'user_city', 'user_age', 'user_gender']
-    item_feats = ['item_id', 'item_picture', 'item_cluster1', 'item_cluster2']
+    item_feats = ['item_id', 'item_picture', 'item_cluster1', 'item_cluster2', 'keywords']
     train_feats = ['network', 'refresh']
     feat_list = []
     for feat in user_feats + item_feats + train_feats:
@@ -107,7 +107,7 @@ def main(args, mode='offline'):
     data_generator = MT_DataGenerator(args, feat_list, user_feats, item_feats, train_feats, mode)
 
     '''Step 3: construct model and use cuda'''
-    cin_size = [10, 10, 10]
+    cin_size = [20, 20, 20]
     model = ESMM(args, cin_size, feat_list, data_generator)
 
     if args.use_cuda:

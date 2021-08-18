@@ -34,11 +34,11 @@ class RecData(Dataset):
 
     def __getitem__(self, index):
 
-        instance, instance_age, instance_gender = self._merge_features(self.inter[index])
+        instance, instance_age, instance_gender, keywords, keywords_p = self._merge_features(self.inter[index])
         if self.mode == 'train':
-            return torch.LongTensor(instance[:-2]), torch.FloatTensor(instance_age), torch.FloatTensor(instance_gender), torch.FloatTensor(instance[-2:])
+            return torch.LongTensor(instance[:-2]), torch.FloatTensor(instance_age), torch.FloatTensor(instance_gender), torch.FloatTensor(keywords), torch.FloatTensor(keywords_p), torch.FloatTensor(instance[-2:])
         elif self.mode == 'test':
-            return torch.LongTensor(instance), torch.FloatTensor(instance_age), torch.FloatTensor(instance_gender)
+            return torch.LongTensor(instance), torch.FloatTensor(instance_age), torch.FloatTensor(instance_gender), torch.FloatTensor(keywords), torch.FloatTensor(keywords_p)
         else:
             raise ValueError
 
@@ -53,10 +53,15 @@ class RecData(Dataset):
         user_feature = list(self.user_feature[user_id][:-2])
         item_feature = list(self.item_feature[item_id])
         instance = user_feature + item_feature + label
+
         instance_age = list(self.user_feature[user_id][-2])
         instance_gender = list(self.user_feature[user_id][-1])
 
-        return instance, instance_age, instance_gender
+        # 处理item_keywords
+        keywords = list(self.item_feature[item_id][-2])
+        keywords_p = list(self.item_feature[item_id][-1])
+
+        return instance, instance_age, instance_gender, keywords, keywords_p
 
 
 
@@ -136,11 +141,15 @@ def collate_point(data, features=['user_id', 'item_id'], mode='offline'):
         x = list(map(lambda x: x[0], data)) # take out features
         x_age = list(map(lambda x: x[1], data))
         x_gender = list(map(lambda x: x[2], data))
+        keywords = list(map(lambda x: x[3], data))
+        keywords_p = list(map(lambda x: x[4], data))
     elif mode == 'online':
         #x = data
         x = list(map(lambda x: x[0], data)) # take out features
         x_age = list(map(lambda x: x[1], data))
         x_gender = list(map(lambda x: x[2], data))
+        keywords = list(map(lambda x: x[3], data))
+        keywords_p = list(map(lambda x: x[4], data))
     else:
         raise ValueError
 
@@ -150,9 +159,11 @@ def collate_point(data, features=['user_id', 'item_id'], mode='offline'):
 
     batch_data['user_age'] = torch.stack(x_age)
     batch_data['user_gender'] = torch.stack(x_gender)
+    batch_data['keywords'] = torch.stack(keywords)
+    batch_data['keywords_p'] = torch.stack(keywords_p)
 
     if mode == 'offline':
-        y = list(map(lambda x: x[3], data))
+        y = list(map(lambda x: x[5], data))
         y = torch.stack(y)
         batch_y['ctr'] = y[:, 0].unsqueeze(1)
         batch_y['cvr'] = y[:, 1].unsqueeze(1)
