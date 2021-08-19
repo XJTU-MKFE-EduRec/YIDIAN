@@ -24,11 +24,14 @@ class xDeepFM(BaseModel):
         self.EMdict = nn.ModuleDict({})
         self.FMLinear = nn.ModuleDict({})
         input_size = 0
-        for feat in feat_list:
-            self.FMLinear[feat.feat_name] = nn.Embedding(feat.vocabulary_size, 1)
-            self.EMdict[feat.feat_name] = nn.Embedding(feat.vocabulary_size, feat.embedding_dim)
+        for feat in feat_list: 
             input_size += feat.embedding_dim
-            nn.init.normal_(self.FMLinear[feat.feat_name].weight, mean=0.0, std=0.0001)
+            if feat.feat_name == 'behavior_id':
+                continue
+            self.FMLinear[feat.feat_name] = nn.Embedding(feat.vocabulary_size, 1)    
+            self.EMdict[feat.feat_name] = nn.Embedding(feat.vocabulary_size, feat.embedding_dim)
+            
+            nn.init.normal_(self.FMLinear[feat.feat_name].weight, mean=0.0, std=0.0001)      
             nn.init.normal_(self.EMdict[feat.feat_name].weight, mean=0.0, std=0.0001)
         
         self.dnn = nn.Sequential(OrderedDict([
@@ -65,6 +68,9 @@ class xDeepFM(BaseModel):
                 if feat.feat_name == 'keywords':
                     EMlist.append(self.keyword_multi_hot(self.EMdict['keywords'], x['keywords'], x['keywords_p']))
                     yLINEAR += self.keyword_multi_hot(self.FMLinear['keywords'], x['keywords'], x['keywords_p'])
+                elif feat.feat_name == 'behavior_id':
+                    EMlist.append(self.keyword_multi_hot(self.EMdict['item_id'], x['behavior_id'], x['behavior_mask']))
+                    yLINEAR += self.keyword_multi_hot(self.FMLinear['item_id'], x['behavior_id'], x['behavior_mask'])
                 else:
                     EMlist.append(self.aggregate_multi_hot(self.EMdict[feat.feat_name], x[feat.feat_name]))
                     yLINEAR += self.aggregate_multi_hot(self.FMLinear[feat.feat_name], x[feat.feat_name])

@@ -20,13 +20,16 @@ from torch.utils.data import Dataset, DataLoader
 class RecData(Dataset):
     '''Input torch tensor for taking out data.'''
     def __init__(self, inter, user_feature, item_feature, uid, iid, 
-                 feat_list, mode='train'):
+                 feat_list, behavior_train, behavior_test, i2index=None, mode='train'):
         super().__init__()
         self.inter = inter
         self.user_feature = user_feature
         self.item_feature = item_feature
         self.uid_dict = uid
         self.iid_dict = iid
+        self.behavior_train = behavior_train
+        self.behavior_test = behavior_test
+        self.i2index = i2index # 记录线下验证集采样后的 index 到原 index
         self.mode = mode
         self.feat_list = feat_list
 
@@ -35,23 +38,40 @@ class RecData(Dataset):
         return len(self.inter)
 
     def __getitem__(self, index):
-
-        instance, instance_age, instance_gender, keywords, keywords_p = self._merge_features(self.inter[index])
+        instance, instance_age, instance_gender, keywords, keywords_p, behavior, behavior_mask = self._merge_features(self.inter[index], index)
         if self.mode == 'train':
-            return torch.LongTensor(instance[:-1]), torch.FloatTensor(instance_age), torch.FloatTensor(instance_gender), torch.FloatTensor(keywords), torch.FloatTensor(keywords_p), torch.FloatTensor([instance[-1]])
+            return torch.LongTensor(instance[:-1]), torch.FloatTensor(instance_age), \
+                   torch.FloatTensor(instance_gender), torch.FloatTensor(keywords), \
+                   torch.FloatTensor(keywords_p), torch.FloatTensor(behavior), \
+                   torch.FloatTensor(behavior_mask), torch.FloatTensor([instance[-1]])
         elif self.mode == 'test':
-            return torch.LongTensor(instance), torch.FloatTensor(instance_age), torch.FloatTensor(instance_gender), torch.FloatTensor(keywords), torch.FloatTensor(keywords_p)
+            return torch.LongTensor(instance), torch.FloatTensor(instance_age), \
+                   torch.FloatTensor(instance_gender), torch.FloatTensor(keywords), \
+                   torch.FloatTensor(keywords_p), torch.FloatTensor(behavior), torch.FloatTensor(behavior_mask)
         else:
             raise ValueError
 
 
-    def _merge_features(self, inter):
+    def _merge_features(self, inter, index):
         '''merge features into interaction data'''
+
+        # 采样后的验证集, 需要将索引映射为采样前的索引
+        if self.i2index is not None:
+            index = self.i2index[index]
 
         user_id = self.uid_dict[inter[0]]
         item_id = self.iid_dict[inter[1]]
         # 取训练集中的其他特征
         label = list(inter[2:])
+
+        # 根据索引取该条交互记录对应的用户历史行为序列
+        if self.mode == 'train':
+            behavior = self.behavior_train[index]
+        else:
+            behavior = self.behavior_test[index]
+        behavior = list(map(lambda x: self.iid_dict[x] if x in self.iid_dict else 0 , behavior))
+        behavior_mask = get_behavior_mask(behavior)
+
         user_feature = list(self.user_feature[user_id][:-2])
         item_feature = list(self.item_feature[item_id][:-2])
         instance = user_feature + item_feature + label
@@ -64,8 +84,7 @@ class RecData(Dataset):
         keywords = list(self.item_feature[item_id][-2])
         keywords_p = list(self.item_feature[item_id][-1])
 
-        return instance, instance_age, instance_gender, keywords, keywords_p
-
+        return instance, instance_age, instance_gender, keywords, keywords_p, behavior, behavior_mask
 
 
 class DataGenerator():
@@ -92,11 +111,19 @@ class DataGenerator():
                 self.train = pickle.load(f)
             with open(self.data_path + 'validation.pkl', 'rb') as f:
                 self.test = pickle.load(f)
+            with open(self.data_path + 'behavior_train.pkl', 'rb') as f:
+                self.behavior_train = pickle.load(f)
+            with open(self.data_path + 'behavior_validation.pkl', 'rb') as f:
+                self.behavior_test = pickle.load(f)
         elif self.mode == 'online':
             with open(self.data_path + 'train_online.pkl', 'rb') as f:
                 self.train = pickle.load(f)
             with open(self.data_path + 'test.pkl', 'rb') as f:
                 self.test = pickle.load(f)
+            with open(self.data_path + 'behavior_train_online.pkl', 'rb') as f:
+                self.behavior_train = pickle.load(f)
+            with open(self.data_path + 'behavior_test.pkl', 'rb') as f:
+                self.behavior_test = pickle.load(f)
         else:
             raise ValueError
         
@@ -162,7 +189,8 @@ class DataGenerator():
         print('Make train data...')
 
         trainset = RecData(self.train, self.user_feature, self.item_feature,
-                           self.uid_dict, self.iid_dict, self.feat_list)
+                           self.uid_dict, self.iid_dict, self.feat_list, 
+                           self.behavior_train, self.behavior_test)
 
         return DataLoader(trainset, 
                           batch_size=self.args.bs,
@@ -179,10 +207,12 @@ class DataGenerator():
         if self.mode == 'offline':
             index = random.choices(list(range(len(self.test))), k=50000)
             testset = RecData(self.test[index], self.user_feature, self.item_feature,
-                              self.uid_dict, self.iid_dict, self.feat_list)
+                              self.uid_dict, self.iid_dict, self.feat_list, 
+                              self.behavior_train, self.behavior_test, i2index=index, mode='test')
         elif self.mode == 'online':
             testset = RecData(self.test, self.user_feature, self.item_feature,
-                              self.uid_dict, self.iid_dict, self.feat_list, mode='test')
+                              self.uid_dict, self.iid_dict, self.feat_list, 
+                              self.behavior_train, self.behavior_test, mode='test')
         # set the max batch size
         bs = min(testset.__len__(), 10000)
 
@@ -192,7 +222,7 @@ class DataGenerator():
                           collate_fn=lambda x: collate_point(x, self.features, self.mode))
 
 
-        
+
 def collate_point(data, features=['user_id', 'item_id'], mode='offline'):
     '''
     Collate samples for point-wise method.
@@ -215,6 +245,9 @@ def collate_point(data, features=['user_id', 'item_id'], mode='offline'):
         keywords_p = list(map(lambda x: x[4], data))
     else:
         raise ValueError
+    
+    behavior = list(map(lambda x: x[5], data))
+    behavior_mask = list(map(lambda x: x[6], data))
 
     x = torch.stack(x)  # (bs, feat_num)
     for i, feat in enumerate(features):
@@ -224,9 +257,11 @@ def collate_point(data, features=['user_id', 'item_id'], mode='offline'):
     batch_data['user_gender'] = torch.stack(x_gender)
     batch_data['keywords'] = torch.stack(keywords)
     batch_data['keywords_p'] = torch.stack(keywords_p)
+    batch_data['behavior_id'] = torch.stack(behavior)
+    batch_data['behavior_mask'] = torch.stack(behavior_mask)
 
     if mode == 'offline':
-        y = list(map(lambda x: x[5], data))
+        y = list(map(lambda x: x[-1 ], data))
         y = torch.FloatTensor(y)
         #y = torch.stack(y)  # (bs, 1)
         y = y.unsqueeze(1)
@@ -249,3 +284,17 @@ def fix_length(x,k):
             x.append(0)
         return x
 
+def fix_behavior_length(x, length):
+    if len(x) == 0:
+        return np.zeros(length)
+    # if len(x) >= length:
+    #     return x[(-1 * length):]
+    for i in range(len(x), length):
+        x.append(0)
+    return x
+
+def get_behavior_mask(behavior):
+    mask = np.where(np.array(behavior) > 0, 1, 0)
+    if sum(mask) != 0:
+        mask = mask / sum(mask)
+    return mask.tolist()
