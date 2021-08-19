@@ -261,7 +261,7 @@ def collate_point(data, features=['user_id', 'item_id'], mode='offline'):
     batch_data['behavior_mask'] = torch.stack(behavior_mask)
 
     if mode == 'offline':
-        y = list(map(lambda x: x[-1 ], data))
+        y = list(map(lambda x: x[-1], data))
         y = torch.FloatTensor(y)
         #y = torch.stack(y)  # (bs, 1)
         y = y.unsqueeze(1)
