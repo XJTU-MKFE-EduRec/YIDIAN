@@ -114,7 +114,7 @@ class BaseModel(nn.Module):
 
             t_loss += loss.item() / self.args.batch_record
             t_auc += evaluate_auc(y, y_) / self.args.batch_record
-
+            
             i += 1
             if not i % self.args.batch_record:
                 train_loss.append(t_loss), train_auc.append(t_auc)

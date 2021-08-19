@@ -65,11 +65,15 @@ class RecData(Dataset):
         label = list(inter[2:])
 
         # 根据索引取该条交互记录对应的用户历史行为序列
-        if self.mode == 'train':
+        if self.mode == 'train' and self.i2index is None: # 线上线下训练
             behavior = self.behavior_train[index]
         else:
             behavior = self.behavior_test[index]
-        behavior = list(map(lambda x: self.iid_dict[x] if x in self.iid_dict else 0 , behavior))
+
+        for i in range(len(behavior)):
+            behavior[i] = self.iid_dict[behavior[i]] if behavior[i] in self.iid_dict else 0
+        
+        # behavior = list(map(lambda x: self.iid_dict[x] if x in self.iid_dict else 0 , behavior))
         behavior_mask = get_behavior_mask(behavior)
 
         user_feature = list(self.user_feature[user_id][:-2])
@@ -102,6 +106,7 @@ class DataGenerator():
         self.features.remove('user_age')
         self.features.remove('user_gender')
         self.features.remove('keywords')
+        self.features.remove('behavior_id')
         
         
     def _load_data(self):
@@ -208,7 +213,7 @@ class DataGenerator():
             index = random.choices(list(range(len(self.test))), k=50000)
             testset = RecData(self.test[index], self.user_feature, self.item_feature,
                               self.uid_dict, self.iid_dict, self.feat_list, 
-                              self.behavior_train, self.behavior_test, i2index=index, mode='test')
+                              self.behavior_train, self.behavior_test, i2index=index)
         elif self.mode == 'online':
             testset = RecData(self.test, self.user_feature, self.item_feature,
                               self.uid_dict, self.iid_dict, self.feat_list, 
