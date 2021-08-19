@@ -116,7 +116,7 @@ def main(args, mode='offline'):
     else:
         raise ValueError
 
-    cin_size = [10, 10, 10]
+    cin_size = [20, 20, 20]
     model = Model(args, cin_size, feat_list, data_generator)
 
     if args.use_cuda:

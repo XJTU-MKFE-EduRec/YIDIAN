@@ -73,7 +73,10 @@ class RecData(Dataset):
         for i in range(len(behavior)):
             behavior[i] = self.iid_dict[behavior[i]] if behavior[i] in self.iid_dict else 0
         
-        # behavior = list(map(lambda x: self.iid_dict[x] if x in self.iid_dict else 0 , behavior))
+        if behavior[0] == 0:
+            behavior[0] = 633391
+
+        behavior = fix_behavior_length(behavior, 10)
         behavior_mask = get_behavior_mask(behavior)
 
         user_feature = list(self.user_feature[user_id][:-2])
@@ -290,10 +293,8 @@ def fix_length(x,k):
         return x
 
 def fix_behavior_length(x, length):
-    if len(x) == 0:
-        return np.zeros(length)
-    # if len(x) >= length:
-    #     return x[(-1 * length):]
+    if len(x) >= length:
+        return x[(-1 * length):]
     for i in range(len(x), length):
         x.append(0)
     return x

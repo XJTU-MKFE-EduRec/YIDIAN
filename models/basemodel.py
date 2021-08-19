@@ -19,6 +19,10 @@ from torch.utils.tensorboard import SummaryWriter
 from utils.evaluation import evaluate_auc
 from utils.selection import *
 
+import sys
+from torch.utils.data import dataloader
+from multiprocessing.reduction import ForkingPickler
+
 
 class BaseModel(nn.Module):
     '''
@@ -60,6 +64,22 @@ class BaseModel(nn.Module):
                                   gamma=self.args.lr_decay, 
                                   last_epoch=-1)
        
+        # 关闭共享内存，以规避容器磁盘不足问题
+        default_collate_func = dataloader.default_collate 
+        def default_collate_override(batch):
+            dataloader._use_shared_memory = False
+            return default_collate_func(batch)
+        
+        setattr(dataloader, 'default_collate', default_collate_override)
+        
+        for t in torch._storage_classes:
+            if sys.version_info[0] == 2:
+                if t in ForkingPickler.dispatch:
+                    del ForkingPickler.dispatch[t]
+            else:
+                if t in ForkingPickler._extra_reducers:
+                    del ForkingPickler._extra_reducers[t]
+
         main_metric = []
         for epoch in range(self.args.epoch):
 
@@ -114,7 +134,7 @@ class BaseModel(nn.Module):
 
             t_loss += loss.item() / self.args.batch_record
             t_auc += evaluate_auc(y, y_) / self.args.batch_record
-            
+
             i += 1
             if not i % self.args.batch_record:
                 train_loss.append(t_loss), train_auc.append(t_auc)
