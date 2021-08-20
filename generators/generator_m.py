@@ -51,7 +51,7 @@ class RecData(Dataset):
         # 取训练集中的其他特征
         label = list(inter[2:])
         user_feature = list(self.user_feature[user_id][:-2])
-        item_feature = list(self.item_feature[item_id])
+        item_feature = list(self.item_feature[item_id][:-2])
         instance = user_feature + item_feature + label
 
         instance_age = list(self.user_feature[user_id][-2])

@@ -100,7 +100,7 @@ class DataGenerator():
         else:
             raise ValueError
         
-        with open(self.data_path + 'user_feature.pkl', 'rb') as f:
+        with open(self.data_path + 'user_feature_online.pkl', 'rb') as f:
             self.user_feature = pickle.load(f)
         with open(self.data_path + 'item_feature.pkl', 'rb') as f:
             self.item_feature = pickle.load(f)
