@@ -76,7 +76,7 @@ class RecData(Dataset):
         if behavior[0] == 0:
             behavior[0] = 633391
 
-        behavior = fix_behavior_length(behavior, 10)
+        behavior = fix_behavior_length(behavior, 15)
         behavior_mask = get_behavior_mask(behavior)
 
         user_feature = list(self.user_feature[user_id][:-2])

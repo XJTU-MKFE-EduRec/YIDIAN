@@ -173,7 +173,7 @@ def submit(DG, model):
 
 if __name__ == '__main__':
 
-    setproctitle.setproctitle("Qidong's Competition")
+    setproctitle.setproctitle("cczhao's Competition")
     args = parser.parse_args()
 
     # 是否线上训练
