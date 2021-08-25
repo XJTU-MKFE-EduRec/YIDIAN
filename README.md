@@ -54,4 +54,5 @@
 - tqdm
 - setproctitle
 - tensorboard
+- scikit-learn
 
