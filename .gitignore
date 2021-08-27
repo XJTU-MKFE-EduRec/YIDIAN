@@ -24,4 +24,4 @@ save_model/
 *.out
 *.txt
 download
-
+!requirements.txt
