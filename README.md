@@ -14,6 +14,7 @@
 │   ├── run_FM.py
 │   └── run_xDeepFM.py # 运行 XDeepFM
 ├── generators
+│   ├── generator_esmm.py  # 多任务ESMM的数据加载类
 │   ├── generator_m.py  # 多任务ESMM的数据加载类
 │   ├── generator.py # DataSet 和 Data Generator
 ├── log # 日志
@@ -23,6 +24,7 @@
 │   ├── layers # 包含输入和序列组件
 │   	├── _loss.py
 │   	├── input.py
+|       ├── sequence.py
 │   ├── basemodel.py
 │   ├── deepfm.py
 │   ├── dnn.py

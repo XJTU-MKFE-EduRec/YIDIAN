@@ -1,18 +1,20 @@
 # -*- encoding: utf-8 -*-
 '''
-@File    :   generator_m.py
-@Time    :   2021/08/11 16:14:18
+@File    :   generator.py
+@Time    :   2021/07/28 11:31:29
 @Author  :   Liu Qidong
-@Version :   1.0
+@Version :   2.0
 @Contact :   dong_liuqi@163.com
 '''
 
 # here put the import lib
 import pickle
 import random
+import numpy as np
+from tqdm import tqdm
+tqdm.pandas(desc='pandas bar')
 import torch
 from torch.utils.data import Dataset, DataLoader
-from generators.generator_esmm import DataGenerator
 
 
 class RecData(Dataset):
@@ -36,7 +38,7 @@ class RecData(Dataset):
 
         instance, instance_age, instance_gender, keywords, keywords_p = self._merge_features(self.inter[index])
         if self.mode == 'train':
-            return torch.LongTensor(instance[:-2]), torch.FloatTensor(instance_age), torch.FloatTensor(instance_gender), torch.FloatTensor(keywords), torch.FloatTensor(keywords_p), torch.FloatTensor(instance[-2:])
+            return torch.LongTensor(instance[:-1]), torch.FloatTensor(instance_age), torch.FloatTensor(instance_gender), torch.FloatTensor(keywords), torch.FloatTensor(keywords_p), torch.FloatTensor([instance[-1]])
         elif self.mode == 'test':
             return torch.LongTensor(instance), torch.FloatTensor(instance_age), torch.FloatTensor(instance_gender), torch.FloatTensor(keywords), torch.FloatTensor(keywords_p)
         else:
@@ -54,6 +56,7 @@ class RecData(Dataset):
         item_feature = list(self.item_feature[item_id][:-2])
         instance = user_feature + item_feature + label
 
+        # 处理user_age和user_gender
         instance_age = list(self.user_feature[user_id][-2])
         instance_gender = list(self.user_feature[user_id][-1])
 
@@ -65,28 +68,39 @@ class RecData(Dataset):
 
 
 
-class MT_DataGenerator(DataGenerator):
+class DataGenerator():
+    '''Generate data for model.'''
+    def __init__(self, args, feat_list, user_feats=['user_id'], 
+                 item_feats=['item_id'], train_feats=[], mode='offline'):
 
-    def __init__(self, args, feat_list, user_feats, item_feats, train_feats, mode):
-        super().__init__(args, feat_list, user_feats=user_feats, item_feats=item_feats, train_feats=train_feats, mode=mode)
-
-
+        self.feat_list = feat_list
+        self.mode = mode
+        self.args = args
+        self.data_path = './data/'
+        self._load_data()
+        self._map_features(user_feats, item_feats)
+        self.features = user_feats + item_feats + train_feats
+        self.features.remove('user_age')
+        self.features.remove('user_gender')
+        self.features.remove('keywords')
+        
+        
     def _load_data(self):
         '''Load data from pickle.'''
         if self.mode == 'offline':
-            with open(self.data_path + 'train_ml.pkl', 'rb') as f:
+            with open(self.data_path + 'train.pkl', 'rb') as f:
                 self.train = pickle.load(f)
-            with open(self.data_path + 'validation_ml.pkl', 'rb') as f:
+            with open(self.data_path + 'validation.pkl', 'rb') as f:
                 self.test = pickle.load(f)
         elif self.mode == 'online':
-            with open(self.data_path + 'train_online_ml.pkl', 'rb') as f:
+            with open(self.data_path + 'train_online.pkl', 'rb') as f:
                 self.train = pickle.load(f)
-            with open(self.data_path + 'test_m.pkl', 'rb') as f:
+            with open(self.data_path + 'test.pkl', 'rb') as f:
                 self.test = pickle.load(f)
         else:
             raise ValueError
         
-        with open(self.data_path + 'user_feature.pkl', 'rb') as f:
+        with open(self.data_path + 'user_feature_online.pkl', 'rb') as f:
             self.user_feature = pickle.load(f)
         with open(self.data_path + 'item_feature.pkl', 'rb') as f:
             self.item_feature = pickle.load(f)
@@ -94,6 +108,55 @@ class MT_DataGenerator(DataGenerator):
             self.uid_dict, self.iid_dict = pickle.load(f)
 
 
+    def _map_features(self, user_feats, item_feats):
+        '''Get features that will be used in model'''
+        #self.user_feature = self.user_feature[user_feats]
+        #self.item_feature = self.item_feature[item_feats]
+        #self.user_feature = self.user_feature.to_numpy()
+        #self.item_feature = self.item_feature.to_numpy()
+        if 'keywords' in item_feats:
+            # 特征keywords里面存的是list，需要变成40列（序列最长为40）, 用0补全
+            # fix_length 变成固定长度
+            self.item_feature['keywords'] = self.item_feature['keywords'].apply(lambda x: fix_length(x,40))
+            self.item_feature['keywords_p'] = self.item_feature['keywords_p'].apply(lambda x: fix_length(x,40))
+            '''
+            # 拼起来
+            keys = [] # 存keywords的label
+            keys_p = [] # 存keywords的概率
+            keywords_feat.apply(lambda x: keys.append(x))
+            keywords_p.apply(lambda x: keys_p.append(x))
+            '''
+            item_feats.append('keywords_p')
+            self.user_feature = self.user_feature[user_feats]
+            self.item_feature = self.item_feature[item_feats]
+            self.user_feature = self.user_feature.to_numpy()
+            self.item_feature = self.item_feature.to_numpy()
+            item_feats.remove('keywords_p')
+
+        else:
+            self.user_feature = self.user_feature[user_feats]
+            self.item_feature = self.item_feature[item_feats]
+            self.user_feature = self.user_feature.to_numpy()
+            self.item_feature = self.item_feature.to_numpy()
+
+    
+    def _merge_features(self, inter):
+        '''merge features into interaction data'''
+        print('Merging Features...')
+        data = []
+        for pair in tqdm(inter):
+            user_id = self.uid_dict[pair[0]]
+            item_id = self.iid_dict[pair[1]]
+            # 取训练集中的其他特征
+            label = list(pair[2:])
+            user_feature = list(self.user_feature[user_id])
+            item_feature = list(self.item_feature[item_id])
+            instance = user_feature + item_feature + label
+            data.append(instance)
+
+        return data
+
+    
     def make_train_loader(self):
         '''Make train dataloader'''
         print('Make train data...')
@@ -129,13 +192,13 @@ class MT_DataGenerator(DataGenerator):
                           collate_fn=lambda x: collate_point(x, self.features, self.mode))
 
 
+        
 def collate_point(data, features=['user_id', 'item_id'], mode='offline'):
     '''
     Collate samples for point-wise method.
     Input: (bs, 2)-->(x, y)
     '''
     batch_data = {}
-    batch_y = {}
 
     if mode == 'offline':
         x = list(map(lambda x: x[0], data)) # take out features
@@ -164,14 +227,25 @@ def collate_point(data, features=['user_id', 'item_id'], mode='offline'):
 
     if mode == 'offline':
         y = list(map(lambda x: x[5], data))
-        y = torch.stack(y)
-        batch_y['ctr'] = y[:, 0].unsqueeze(1)
-        batch_y['cvr'] = y[:, 1].unsqueeze(1)
+        y = torch.FloatTensor(y)
         #y = torch.stack(y)  # (bs, 1)
-        #y = y.unsqueeze(1)
-        return batch_data, batch_y
+        y = y.unsqueeze(1)
+        return batch_data, y
 
     elif mode == 'online':
         return batch_data
+    
 
+def fix_length(x,k):
+    # x 为输入的list，k为要变成的固定长度
+    if x == 'nan':
+        return np.zeros(40)
+    else:
+        if type(x[0]) == type('a'):
+            # 先归一化处理
+            x = list(map(float, x))
+            x = list(np.divide(x,sum(x)))
+        for i in range(len(x),k):
+            x.append(0)
+        return x
 
