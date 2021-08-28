@@ -13,6 +13,7 @@ from models.basemodel import BaseModel
 from models.layers.input import *
 import torch
 import torch.nn as nn
+from models.layers.sequence import *
 
 
 class xDeepFM(BaseModel):
@@ -24,12 +25,20 @@ class xDeepFM(BaseModel):
         self.EMdict = nn.ModuleDict({})
         self.FMLinear = nn.ModuleDict({})
         input_size = 0
-        for feat in feat_list:
-            self.FMLinear[feat.feat_name] = nn.Embedding(feat.vocabulary_size, 1)
-            self.EMdict[feat.feat_name] = nn.Embedding(feat.vocabulary_size, feat.embedding_dim)
+        for feat in feat_list: 
             input_size += feat.embedding_dim
-            nn.init.normal_(self.FMLinear[feat.feat_name].weight, mean=0.0, std=0.0001)
+            if feat.feat_name == 'behavior_id':
+                continue
+            self.FMLinear[feat.feat_name] = nn.Embedding(feat.vocabulary_size, 1)    
+            self.EMdict[feat.feat_name] = nn.Embedding(feat.vocabulary_size, feat.embedding_dim)
+            
+            nn.init.normal_(self.FMLinear[feat.feat_name].weight, mean=0.0, std=0.0001)      
             nn.init.normal_(self.EMdict[feat.feat_name].weight, mean=0.0, std=0.0001)
+
+        self.attention = AttentionWeightLayer(input_dim=feat_list[0].embedding_dim)
+        self.average = AveragePoolingLayer()
+
+        self.attention_linear = AttentionWeightLayer(input_dim=1)
         
         self.dnn = nn.Sequential(OrderedDict([
             ('L1', nn.Linear(input_size, 200)),
@@ -65,6 +74,19 @@ class xDeepFM(BaseModel):
                 if feat.feat_name == 'keywords':
                     EMlist.append(self.keyword_multi_hot(self.EMdict['keywords'], x['keywords'], x['keywords_p']))
                     yLINEAR += self.keyword_multi_hot(self.FMLinear['keywords'], x['keywords'], x['keywords_p'])
+                elif feat.feat_name == 'behavior_id':
+                    behavior_sequence_vector = self.get_behavior_sequence_vector(self.EMdict['item_id'], x['behavior_id'])
+                    item_vector = self.EMdict['item_id'](x['item_id'].long())
+                    w = self.attention(behavior_sequence_vector, item_vector)
+                    behavior_sequence_vector = self.average(behavior_sequence_vector, x['behavior_mask'], w)
+                    EMlist.append(behavior_sequence_vector)
+
+                    # behavior_sequence_vector = self.get_behavior_sequence_vector(self.FMLinear['item_id'], x['behavior_id']) # (bs * max_length * 1)
+                    # item_vector = self.FMLinear['item_id'](x['item_id'].long()) # (bs * 1)
+                    # w = self.attention_linear(behavior_sequence_vector, item_vector)
+                    # behavior_sequence_vector = self.average(behavior_sequence_vector, x['behavior_mask'], w)
+                    # yLINEAR += behavior_sequence_vector
+                    yLINEAR += self.keyword_multi_hot(self.FMLinear['item_id'], x['behavior_id'], x['behavior_mask'])
                 else:
                     EMlist.append(self.aggregate_multi_hot(self.EMdict[feat.feat_name], x[feat.feat_name]))
                     yLINEAR += self.aggregate_multi_hot(self.FMLinear[feat.feat_name], x[feat.feat_name])

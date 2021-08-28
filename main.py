@@ -85,15 +85,15 @@ parser.add_argument('-em-dim', default=16, type=int,
 
 
 
-def main(args, mode='offline', cin_size=[20, 20, 20]):
+def main(args, mode='offline'):
 
-    with open('./data/info.json', 'r') as f:
+    with open('./data/info_din.json', 'r') as f:
         info = json.load(f)
 
     '''Step 1: Create item feat and user feat and feature list'''
-    user_feats = ['user_id', 'user_device', 'user_system', 'user_province', 'user_city', 'user_inter', 'user_age', 'user_gender']
+    user_feats = ['user_id', 'user_device', 'user_system', 'user_province', 'user_city', 'user_age', 'user_gender']
     item_feats = ['item_id', 'item_picture', 'item_cluster1', 'item_cluster2', 'keywords']
-    train_feats = ['network', 'refresh']
+    train_feats = ['network', 'refresh', 'behavior_id']
     feat_list = []
     for feat in user_feats + item_feats + train_feats:
         if feat in info['feat_type']['sparse']:
@@ -116,6 +116,7 @@ def main(args, mode='offline', cin_size=[20, 20, 20]):
     else:
         raise ValueError
 
+    cin_size = [20, 20, 20]
     model = Model(args, cin_size, feat_list, data_generator)
 
     if args.use_cuda:
@@ -172,7 +173,7 @@ def submit(DG, model):
 
 if __name__ == '__main__':
 
-    setproctitle.setproctitle("Qidong's Competition")
+    setproctitle.setproctitle("cczhao's Competition")
     args = parser.parse_args()
 
     # 是否线上训练
