@@ -320,7 +320,19 @@ class BaseModel(nn.Module):
 
         return res
 
+    def get_behavior_sequence_vector(self, EMdict, x):
+        concat_sequence = []
+        temp_sequence= []
+        # embedding each unit in sequence
+        for i in range(len(x[0])):
+            unit_x = x[:, i].unsqueeze(1)  # (bs, 1)
+            unit_em = EMdict(unit_x.long())    #(bs, 1, embedding_dim)
+            temp_sequence.append(unit_em)
+        temp_sequence = torch.cat(temp_sequence, dim=1)     # (bs, max_length, embedding_dim)
+        concat_sequence.append(temp_sequence)
+        concat_sequence = torch.cat(concat_sequence, dim=2)     #(bs, max_length, v_dim)
 
+        return concat_sequence
 
 
 
